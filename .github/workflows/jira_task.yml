@@ -1,0 +1,41 @@
+name: Playwright Tests
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm            # <- speeds up npm ci
+      - run: npm ci
+
+      - name: Create Jira Task (always)
+        id: jira
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_PROJECT: ZT
+        run: |
+          curl -sS -X POST \
+            -u "$JIRA_USER_EMAIL:$JIRA_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            "$JIRA_BASE_URL/rest/api/3/issue" \
+            -d '{
+                  "fields": {
+                    "project": {"key": "ZT"},
+                    "summary": "CSMS workflow",
+                    "description": "Triggered by '"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"'",
+                    "issuetype": {"name": "Task"}
+                  }
+                }' > jira.json
+          echo "issue_key=$(jq -r '.key' jira.json)" >> $GITHUB_OUTPUT
+
