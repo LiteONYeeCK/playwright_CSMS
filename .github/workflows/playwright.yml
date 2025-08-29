@@ -46,17 +46,28 @@ jobs:
             -u "${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}" \
             -H "Content-Type: application/json" \
             "${JIRA_BASE_URL}/rest/api/3/issue" \
-            -d "$(jq -n \
-              --arg repo "${GITHUB_REPOSITORY}" \
-              --arg run  "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
-              '{
-                 fields: {
-                   project: { key: "ZT" },
-                   summary: "CSMS workflow",
-                   description: ("GitHub Actions run: " + $run),
-                   issuetype: { name: "Task" }
-                 }
-              }')" > jira.json
+            -d '{
+                  "fields": {
+                    "project": { "key": "ZT" },
+                    "summary": "CSMS workflow",
+                    "description": {
+                      "type": "doc",
+                      "version": 1,
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "GitHub Actions run: '"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"'"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "issuetype": { "name": "Task" }
+                  }
+                }' > jira.json
           echo "issue_key=$(jq -r '.key' jira.json)" >> $GITHUB_OUTPUT
 
       - name: Run Playwright tests
