@@ -44,3 +44,55 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 30
+      - name: Prepare env variables
+        if: always()
+        run: |
+          echo "REPORT_URL=https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_ENV
+          echo "STATUS=${{ steps.tests.outcome }}" >> $GITHUB_ENV
+
+      - name: Create Jira issue + CSV on failure
+        if: steps.tests.outcome == 'failure'
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_PROJECT: "YOURPROJKEY"       # <--- change me
+        run: |
+          npm install axios handlebars
+          node scripts/create-jira-issue.js
+
+      - name: Send e-mail notification
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USER }}
+          password: ${{ secrets.MAIL_PASS }}
+          from: GitHub Actions <${{ secrets.MAIL_USER }}>
+          to: liteonsgyeeck@gmail.com
+          subject: "Playwright run ${{ env.STATUS }} on ${{ github.repository }}"
+          html_body: |
+            <p>Repository: <strong>${{ github.repository }}</strong></p>
+            <p>Branch: <strong>${{ github.ref_name }}</strong></p>
+            <p>Status: <strong style="color:${{ env.STATUS == 'success' && 'green' || 'red' }}">${{ env.STATUS }}</strong></p>
+            <p>Report: <a href="${{ env.REPORT_URL }}">${{ env.REPORT_URL }}</a></p>
+            ${{ env.STATUS == 'failure' && '<p>A new Jira Task has been created.</p>' || '' }}
+      # - name: Send e-mail (with Handlebars template)
+      #   if: always()
+      #   uses: dawidd6/action-send-mail@v3
+      #   with:
+      #     server_address: smtp.gmail.com
+      #     server_port: 465
+      #     username: ${{ secrets.MAIL_USER }}
+      #     password: ${{ secrets.MAIL_PASS }}
+      #     from: GitHub Actions <${{ secrets.MAIL_USER }}>
+      #     to: liteonsgyeeck@gmail.com
+      #     subject: "Playwright run ${{ env.STATUS }} on ${{ github.repository }}"
+      #     html_body: file://scripts/email-template.hbs
+      #     convert_markdown: false
+env:
+  JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+  JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+  JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+  JIRA_PROJECT: ${{ secrets.JIRA_PROJECT }}
